@@ -113,6 +113,24 @@ invalid inputs, the scoring curve, and the exact wrong answers the old code
 used to give, so every bug in the log above now has a test that fails if it
 ever comes back.
 
+For the edge-case extension I went looking for inputs that would survive the
+main repair, and the parser still had three holes: a 5000-digit guess and the
+words "inf"/"nan" were both rejected with a message about decimals they did
+not contain, and `"1_0"` and `"٤٢"` were **silently accepted** as 10 and 42,
+because `int()` honours PEP 515 underscores and any Unicode decimal digit.
+The last one charged the player an attempt for a number they never typed.
+
+That extension also produced the most useful scare of the project. After
+fixing the parser, the live app *still* accepted `1_0` as 10 while the unit
+test insisted it was rejected. My first instinct was that the fix was wrong.
+It was not: Streamlit reran `app.py` on save but kept the already-imported
+`logic_utils` in memory, so the browser was exercising the previous version of
+the parser. Restarting the server on a clean port showed the correct message.
+Two tools disagreed and both were behaving correctly — the resolution was to
+work out *what each one was actually measuring* rather than to trust the one
+that felt more real. Had I trusted the browser, I would have rewritten a
+function that was already right.
+
 AI helped most with the boring half of testing — generating the parametrised
 edge cases for `parse_guess` (empty, whitespace, `None`, `"50abc"`, negatives,
 out-of-range) faster than I would have listed them. I still had to decide what

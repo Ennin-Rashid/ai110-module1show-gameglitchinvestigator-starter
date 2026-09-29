@@ -228,8 +228,8 @@ This is a real playthrough of the fixed app, captured while verifying the fixes.
 ## 🧪 Test Results
 
 `tests/test_game_logic.py` keeps the three starter tests unchanged and adds
-regression tests that fail against the original code. 24 test functions expand
-to 49 cases through parametrisation. Every bug in the log has a test that fails
+regression tests that fail against the original code. 30 test functions expand
+to 64 cases through parametrisation. Every bug in the log has a test that fails
 if it ever comes back.
 
 The test that matters most is
@@ -246,12 +246,12 @@ platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
 rootdir: C:\Users\User\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\scratch-workspaces\c6645cfb-b89c-48bd-891d-1777147ebe2f\7e1bfdcb-38eb-4b29-8269-be54ba8512ef\scratch-2026-09-28-a903d5\repo
 configfile: pytest.ini
 plugins: anyio-4.14.2, langsmith-0.10.7
-collected 49 items
+collected 64 items
 
-tests\test_game_logic.py ............................................... [ 95%]
-..                                                                       [100%]
+tests\test_game_logic.py ............................................... [ 73%]
+.................                                                        [100%]
 
-============================= 49 passed in 0.41s ==============================
+============================= 64 passed in 0.81s ==============================
 ```
 
 The same output is saved to [`test_results.txt`](test_results.txt).
@@ -263,11 +263,42 @@ The same output is saved to [`test_results.txt`](test_results.txt).
 
 ## 🚀 Stretch Features
 
-None attempted — this submission covers the core project only, so
-`ai_interactions.md` is intentionally left as the blank template (it is
-required only for stretch challenges).
+### ✅ Challenge 1: Advanced Edge-Case Testing
 
-A few UI changes were made as part of the repair rather than as a stretch
-feature: Score and Attempts-left metrics in the header, a guess history line,
-and distinct error messages for non-numbers, decimals and out-of-range
-guesses.
+The main repair already rejected decimals, non-numbers and out-of-range
+guesses. This challenge asked what could **still** break the game, so rather
+than re-test what was covered I probed `parse_guess` with inputs chosen to
+attack Python's own numeric parsing. Three classes of input were still wrong:
+
+| # | Input | What it did | Why that is wrong |
+|---|---|---|---|
+| 1 | `"9" * 5000` | Reported *"Whole numbers only — no decimals."* | CPython refuses `int(str)` past 4300 digits, and the fallback asked `float()`, which returns `inf` instead of raising — so a huge integer was blamed on a decimal point it did not contain. |
+| 2 | `"inf"`, `"nan"` | Reported *"Whole numbers only — no decimals."* | `float("inf")` succeeds, so these reached the decimal branch. Neither contains a digit, let alone a decimal point. |
+| 3 | `"1_0"`, `"٤٢"`, `"１０"` | **Silently accepted** as 10, 42 and 10 | `int()` honours PEP 515 underscore separators and any Unicode decimal digit. The game played a different number than the player typed and charged them an attempt for it. |
+
+Category 3 was the serious one: the other two produced a confusing message,
+but this one silently changed the player's input — the same class of bug as
+the original `int(float("5.9"))` truncation.
+
+**The fix:** `parse_guess` now validates the *shape* of the input with
+`_PLAIN_INTEGER = re.compile(r"[+-]?[0-9]+\Z")` before converting anything.
+Non-matching input goes to a branch that distinguishes a real decimal from
+another numeric spelling from outright garbage, so every rejection message is
+true. Surrounding whitespace — including non-breaking spaces from pasted text
+— is still forgiven, since that is a paste artefact rather than a different
+number.
+
+**15 new cases** (6 test functions) cover these, including
+`test_every_rejection_explains_itself`, which asserts no input is ever
+rejected with an empty message and that nothing is blamed on decimals unless
+it actually contains a `.`.
+
+Prompts and per-case reasoning are recorded in
+[`ai_interactions.md`](ai_interactions.md).
+
+### Not attempted
+
+Challenges 2, 3, 4 and 5. A few UI changes were made as part of the core
+repair rather than as a stretch feature: Score and Attempts-left metrics in
+the header, a guess-history line, and distinct error messages for each kind of
+invalid input.

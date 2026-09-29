@@ -5,6 +5,13 @@ can be unit tested directly. `app.py` owns the UI and session state; this
 module owns the rules.
 """
 
+import math
+import re
+
+# A guess must be plain ASCII digits with an optional sign. Anything else
+# goes to the error branch, which works out what to tell the player.
+_PLAIN_INTEGER = re.compile(r"[+-]?[0-9]+\Z")
+
 # FIX: Hard was 1-50 (narrower than Normal's 1-100) while also giving the
 # fewest attempts. Claude flagged it when a test asserted the ranges should
 # widen with difficulty; I picked the new numbers and checked each is still
@@ -62,8 +69,11 @@ def parse_guess(raw, low=None, high=None):
     Returns ``(ok, guess_int, error_message)``. Exactly one of ``guess_int``
     and ``error_message`` is ever non-None.
 
-    Rejects (rather than silently truncating) decimals such as "5.9", and
-    rejects guesses outside ``[low, high]`` when a range is supplied.
+    Input must be plain ASCII digits with an optional sign. That is stricter
+    than bare ``int()``, which also accepts PEP 515 underscore separators
+    ("1_0" -> 10) and non-ASCII decimal digits ("٤٢" -> 42) — both of
+    which would silently turn a typo into a different number than the player
+    typed.
     """
     if raw is None:
         return False, None, "Enter a guess."
@@ -72,15 +82,27 @@ def parse_guess(raw, low=None, high=None):
     if not text:
         return False, None, "Enter a guess."
 
+    if not _PLAIN_INTEGER.match(text):
+        # Not plain digits. Work out whether it is a decimal, some other
+        # numeric spelling, or simply not a number, so the message is true.
+        try:
+            as_float = float(text)
+        except ValueError:
+            return False, None, f"'{text}' is not a number."
+        if not math.isfinite(as_float):
+            # "inf" and "nan" parse as floats but are not numbers a player
+            # can guess.
+            return False, None, f"'{text}' is not a number."
+        if "." in text:
+            return False, None, "Whole numbers only — no decimals."
+        return False, None, "Enter the number as plain digits, like 42."
+
     try:
         value = int(text)
     except ValueError:
-        # Give a decimal its own message so the player knows why it bounced.
-        try:
-            float(text)
-        except ValueError:
-            return False, None, f"'{text}' is not a number."
-        return False, None, "Whole numbers only — no decimals."
+        # CPython refuses int(str) beyond 4300 digits. Such a guess is out of
+        # range by any measure, so say that rather than leaking the limit.
+        return False, None, "That number is far too large."
 
     if low is not None and high is not None and not (low <= value <= high):
         return False, None, f"Guess must be between {low} and {high}."

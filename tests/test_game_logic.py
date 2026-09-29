@@ -172,3 +172,71 @@ def test_binary_search_always_wins_within_the_attempt_limit():
                     f"{difficulty}: secret {secret} unwinnable in {limit} attempts"
                 )
             assert score >= 10, f"{difficulty}: winning score should be positive"
+
+
+# --- Challenge 1: advanced edge cases ---------------------------------------
+# Three classes of input that still broke the game after the main repair. Each
+# was found by probing parse_guess directly, not by reading the code.
+
+# Edge case 1: values too large for CPython to convert.
+# int(str) refuses beyond 4300 digits (ValueError), and the old fallback then
+# asked float(), which returns inf rather than raising — so a 5000-digit guess
+# was reported as "Whole numbers only — no decimals.", which is not true.
+
+def test_absurdly_long_number_is_rejected_as_too_large():
+    ok, value, error = parse_guess("9" * 5000, 1, 100)
+    assert (ok, value) == (False, None)
+    assert error == "That number is far too large."
+
+def test_long_but_convertible_number_is_rejected_as_out_of_range():
+    ok, value, error = parse_guess("9" * 100, 1, 100)
+    assert (ok, value) == (False, None)
+    assert "between 1 and 100" in error
+
+
+# Edge case 2: float keywords that are not guessable numbers.
+# float("inf") and float("nan") both succeed, so these reached the decimal
+# branch and produced a message about decimals for input containing no digits.
+
+@pytest.mark.parametrize("raw", ["inf", "-inf", "nan", "Infinity"])
+def test_float_keywords_are_not_numbers(raw):
+    ok, value, error = parse_guess(raw, 1, 100)
+    assert (ok, value) == (False, None)
+    assert "is not a number" in error
+
+
+# Edge case 3: numeric spellings int() accepts but a player never intends.
+# PEP 515 lets int("1_0") return 10, and int()/float() accept any Unicode
+# decimal digit, so "٤٢" became 42. Both silently produce a different number
+# than the one typed.
+
+@pytest.mark.parametrize("raw, would_have_become", [
+    ("1_0", 10),            # PEP 515 underscore separator
+    ("٤٢", 42),   # Arabic-Indic digits
+    ("５０", 50),   # full-width digits
+    ("1e3", 1000),          # scientific notation
+])
+def test_non_plain_digit_spellings_are_rejected_not_reinterpreted(raw, would_have_become):
+    ok, value, error = parse_guess(raw, 1, 10000)
+    assert ok is False, f"{raw!r} was silently accepted as {would_have_become}"
+    assert value is None
+    assert error == "Enter the number as plain digits, like 42."
+
+
+# Whitespace that is not a plain space must still be tolerated, since it is
+# usually an artefact of pasting rather than a different number.
+
+@pytest.mark.parametrize("raw", [" 50", "50\n", "\t50 ", "  50  "])
+def test_surrounding_whitespace_is_forgiven(raw):
+    assert parse_guess(raw, 1, 100) == (True, 50, None)
+
+
+def test_every_rejection_explains_itself():
+    """No input may be rejected with an empty or misleading message."""
+    for raw in ["", "   ", None, "abc", "5.9", "inf", "nan", "1_0", "1e3",
+                "0", "101", "-7", "9" * 5000]:
+        ok, value, error = parse_guess(raw, 1, 100)
+        assert ok is False and value is None
+        assert error and error.strip(), f"{raw!r} rejected with no message"
+        if "decimal" in error.lower():
+            assert "." in str(raw), f"{raw!r} wrongly blamed on decimals"

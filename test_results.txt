@@ -3,9 +3,9 @@ platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
 rootdir: C:\Users\User\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\scratch-workspaces\c6645cfb-b89c-48bd-891d-1777147ebe2f\7e1bfdcb-38eb-4b29-8269-be54ba8512ef\scratch-2026-09-28-a903d5\repo
 configfile: pytest.ini
 plugins: anyio-4.14.2, langsmith-0.10.7
-collected 49 items
+collected 64 items
 
-tests\test_game_logic.py ............................................... [ 95%]
-..                                                                       [100%]
+tests\test_game_logic.py ............................................... [ 73%]
+.................                                                        [100%]
 
-============================= 49 passed in 0.41s ==============================
+============================= 64 passed in 0.81s ==============================
