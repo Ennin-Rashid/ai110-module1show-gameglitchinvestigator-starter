@@ -180,6 +180,16 @@ that must survive a rerun belongs in `session_state`, and everything in
 `session_state` needs exactly one function that knows how to reset it. Here
 that function is `start_new_round()`.
 
+## 📝 Document Your Experience
+
+- [x] **Describe the game's purpose.** → [What the game does](#-what-the-game-does)
+- [x] **Detail which bugs you found.** → [Bugs found](#-bugs-found) (nine, each
+      reproduced before it was fixed) and the reproduction log in
+      [`reflection.md`](reflection.md) section 1.
+- [x] **Explain what fixes you applied.** → [Fixes applied](#-fixes-applied),
+      plus `# FIX:` comments at each of the eight repair sites in `app.py` and
+      `logic_utils.py` recording how each one was found.
+
 ## 📸 Demo Walkthrough
 
 This is a real playthrough of the fixed app, captured while verifying the fixes.
@@ -218,17 +228,46 @@ This is a real playthrough of the fixed app, captured while verifying the fixes.
 ## 🧪 Test Results
 
 `tests/test_game_logic.py` keeps the three starter tests unchanged and adds
-regression tests that fail against the original code — including
-`test_binary_search_always_wins_within_the_attempt_limit`, which plays a
-perfect game against **every** secret at **every** difficulty and asserts the
-game is winnable. That is the test that would have caught the unwinnable game.
+regression tests that fail against the original code. 24 test functions expand
+to 49 cases through parametrisation. Every bug in the log has a test that fails
+if it ever comes back.
+
+The test that matters most is
+`test_binary_search_always_wins_within_the_attempt_limit`: it plays a perfect
+game against **every** secret at **every** difficulty and asserts the game is
+winnable. That is what would have caught the original "you can't win"
+complaint without anyone having to play, and it is what forced Hard to become
+1–200 with 10 attempts — 1–50 in 5 attempts is not solvable in the worst case.
 
 ```
-$ python -m pytest tests/ -q
-.................................................                        [100%]
-49 passed in 2.17s
+$ python -m pytest tests/
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\User\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\scratch-workspaces\c6645cfb-b89c-48bd-891d-1777147ebe2f\7e1bfdcb-38eb-4b29-8269-be54ba8512ef\scratch-2026-09-28-a903d5\repo
+configfile: pytest.ini
+plugins: anyio-4.14.2, langsmith-0.10.7
+collected 49 items
+
+tests\test_game_logic.py ............................................... [ 95%]
+..                                                                       [100%]
+
+============================= 49 passed in 0.41s ==============================
 ```
+
+The same output is saved to [`test_results.txt`](test_results.txt).
+
+> `pytest.ini` pins `rootdir` to this repo and puts it on `pythonpath`. Without
+> it, pytest walked up past the project and picked up an unrelated
+> `pyproject.toml` from the home directory, so where the tests passed from
+> depended on the machine.
 
 ## 🚀 Stretch Features
 
-- [ ] [If you choose to complete Challenge 4, describe the Enhanced UI changes here — a screenshot is optional]
+None attempted — this submission covers the core project only, so
+`ai_interactions.md` is intentionally left as the blank template (it is
+required only for stretch challenges).
+
+A few UI changes were made as part of the repair rather than as a stretch
+feature: Score and Attempts-left metrics in the header, a guess history line,
+and distinct error messages for non-numbers, decimals and out-of-range
+guesses.
