@@ -41,7 +41,15 @@ win, the higher the score. Wrong guesses cost 5 points each.
 
 ## 🐛 Bugs found
 
-Every bug below was reproduced before it was fixed.
+Every bug below was reproduced before it was fixed — each one was triggered
+with known inputs and its wrong output captured, so the fix could be aimed at
+the bug that existed rather than the bug that was assumed.
+
+Note the distribution: **zero syntax errors**. The file parsed cleanly and the
+app booted on the first try. One **runtime** bug (#2, a `TypeError`) and eight
+**logic** bugs, and even the runtime bug was swallowed by a bare `except` and
+converted into a wrong answer before it could reach the screen. Nothing here
+would have been caught by a linter or by the code simply running.
 
 ### 1. The hints were inverted (`check_guess`)
 

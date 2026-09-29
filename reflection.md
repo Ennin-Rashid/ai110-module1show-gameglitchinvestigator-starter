@@ -18,7 +18,14 @@ could name immediately were **the hints were backwards** and **"New Game" did
 nothing once you had won or lost** — the status flag was never reset, so the
 `st.stop()` guard trapped the app on the game-over screen until I restarted
 the server. Underneath those, the score was moving in whichever direction the
-attempt counter's parity felt like.
+attempt counter's parity felt like. Worth naming the categories: there were
+**no syntax errors at all** — the file parsed and the app booted on the first
+try, which is exactly what made it feel trustworthy. What it had was one
+**runtime** bug (a `TypeError` from comparing `int > str`) and eight **logic**
+bugs. The runtime error was the only one Python itself objected to, and a bare
+`except TypeError` caught it and turned it into a wrong answer, so even that
+one never surfaced. AI-generated code tends to fail this way: the syntax is
+free, and every bug lives in the meaning.
 
 **Bug Reproduction Log**
 
@@ -63,6 +70,21 @@ negative score in a casual guessing game is noise rather than information.
 Both changes are pinned by tests, which is how I know the behaviour is what I
 think it is.
 
+**A suggestion I rejected outright:** the starter README told me the secret
+number "changes every time you click Submit" and pointed me at the prompt
+*"How do I keep a variable from resetting in Streamlit when I click a button?"*
+I checked before asking it, and the claim was false — the secret was already
+correctly guarded behind `if "secret" not in st.session_state`, so it was never
+being regenerated. Asking that question would have produced a confident,
+well-formatted answer about `st.session_state` for a bug that does not exist:
+a **hallucination** invited by a bad premise rather than by the model. The
+symptom was real, but the cause was the opposite one — state that persisted
+when it should have been cleared, because "New Game" never reset `status`. So
+I dropped the suggested prompt and sat with the debug expander open until I
+could see which value was actually wrong. That is the **human-in-the-loop**
+part of this workflow doing real work: an AI can only answer the question you
+ask it, and deciding *which question is worth asking* stayed my job.
+
 ## 3. Debugging and testing your fixes
 
 A bug counted as fixed when a test that failed against the old code passed
@@ -77,6 +99,19 @@ mode had been given the fewest attempts. Running it forced a real design
 decision: Hard had to become 1–200 with 10 attempts, because 1–50 with 5
 attempts is not solvable in the worst case. The suite went from 3 failing to
 49 passing.
+
+Two habits carried the weight here. First, a bug was never "fixed" on the
+strength of reading the patch — **verification** meant a test that failed
+before the change and passed after it, plus a run of the real app in a browser
+to confirm the fix survived contact with Streamlit's rerun model. That second
+step earned its keep: it caught a bug in *my own* rewrite, where the score and
+attempts-left metrics render above the submit handler and so displayed the
+state from before the guess. Every unit test was green while the UI was
+visibly lying. Second, the **test set** is deliberately wider than the three
+starter cases — it pins the boundaries (1, and the top of each range), the
+invalid inputs, the scoring curve, and the exact wrong answers the old code
+used to give, so every bug in the log above now has a test that fails if it
+ever comes back.
 
 AI helped most with the boring half of testing — generating the parametrised
 edge cases for `parse_guess` (empty, whitespace, `None`, `"50abc"`, negatives,
