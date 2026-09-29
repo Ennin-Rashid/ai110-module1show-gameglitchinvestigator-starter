@@ -23,6 +23,11 @@ WON = "won"
 LOST = "lost"
 
 
+# FIX: the headline bug. "New Game" reset only attempts and secret, leaving
+# status at "won"/"lost" forever, so the st.stop() guard below trapped the app
+# on the game-over screen until the server was restarted. Collapsing every
+# reset into one function was Claude's suggestion and I took it as-is: the
+# original bug was four scattered assignments with a fifth one forgotten.
 def start_new_round(difficulty: str, reset_score: bool = True) -> None:
     """Reset every piece of round state for a fresh game.
 
@@ -65,6 +70,9 @@ st.sidebar.caption(f"Attempts allowed: {attempt_limit}")
 if "secret" not in st.session_state:
     start_new_round(difficulty)
 
+# FIX: the secret used to be drawn once from whatever difficulty was selected
+# at startup and never redrawn, so switching difficulty left a secret outside
+# the range the UI was advertising.
 # Changing difficulty changes the valid range, so the old secret may now be
 # unreachable. Start a fresh round instead of leaving a stale secret behind.
 if st.session_state.difficulty != difficulty:
@@ -122,6 +130,9 @@ with st.form("guess_form", clear_on_submit=True):
     raw_guess = st.text_input("Enter your guess:")
     submit = st.form_submit_button("Submit Guess 🚀")
 
+# FIX: attempts += 1 used to run BEFORE parsing, so a typo burned a turn, and
+# the loss check lived only in the valid-guess branch — a run of typos could
+# push attempts past the limit without ever ending the game.
 if submit:
     ok, guess, error = parse_guess(raw_guess, low, high)
 
@@ -148,6 +159,8 @@ if submit:
         else:
             st.session_state.last_feedback = f"{guess} is not it. Try again."
 
+        # FIX: found by running the app, not by the tests — every unit test was
+        # green while the UI showed "Attempts used: 0" after a guess had landed.
         # Rerun unconditionally: the score and attempts-left metrics are drawn
         # above this handler, so without a rerun they would show the state from
         # before this guess.

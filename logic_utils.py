@@ -5,6 +5,10 @@ can be unit tested directly. `app.py` owns the UI and session state; this
 module owns the rules.
 """
 
+# FIX: Hard was 1-50 (narrower than Normal's 1-100) while also giving the
+# fewest attempts. Claude flagged it when a test asserted the ranges should
+# widen with difficulty; I picked the new numbers and checked each is still
+# winnable by binary search within its attempt limit.
 DIFFICULTY_RANGES = {
     "Easy": (1, 20),
     "Normal": (1, 100),
@@ -48,6 +52,10 @@ def get_attempt_limit(difficulty: str) -> int:
     return DIFFICULTY_ATTEMPTS.get(difficulty, DIFFICULTY_ATTEMPTS[DEFAULT_DIFFICULTY])
 
 
+# FIX: Claude's first pass kept the original int(float(raw)) so "5.9" became 5.
+# I rejected that — silently deciding what the player meant is the same class of
+# mistake as the rest of this codebase — and had it reject decimals instead.
+# Range validation is new: out-of-range guesses used to be accepted.
 def parse_guess(raw, low=None, high=None):
     """Parse raw text input into an integer guess.
 
@@ -80,6 +88,13 @@ def parse_guess(raw, low=None, high=None):
     return True, value, None
 
 
+# FIX: two bugs here. The hints were inverted ("Too High" told you to go
+# HIGHER), and app.py stringified the secret on even attempts, so a bare
+# `except TypeError` re-compared both values as text ("9" > "50") and produced
+# confident lies. Refactored out of app.py into this module with Claude in
+# agent mode; the int() coercion and the deleted except clause are the fix.
+# Returning a bare outcome string (not a tuple) is what the starter tests
+# already specified — I kept their contract instead of rewriting them.
 def check_guess(guess, secret) -> str:
     """Compare a guess to the secret and return the outcome.
 
@@ -105,6 +120,11 @@ def hint_for(outcome: str) -> str:
     return HINTS.get(outcome, "")
 
 
+# FIX: a first-guess win paid 70 because attempts started at 1 and was
+# incremented before scoring, and "Too High" *awarded* +5 on even attempts
+# (`if attempt_number % 2 == 0`) while "Too Low" always subtracted. Claude
+# spotted the parity branch; I chose the 1-based attempt_number contract and
+# the clamp at zero, both pinned by tests.
 def update_score(current_score: int, outcome: str, attempt_number: int) -> int:
     """Return the new score after an attempt.
 
